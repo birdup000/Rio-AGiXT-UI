@@ -1,0 +1,6 @@
+# This is the configuration file for Rio,
+# an easy to use app & web framework for Python.
+
+[app]
+app_type = "website"  # This is either "website" or "app"
+main_module = "agixt"  # The name of your Python module
