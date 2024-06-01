@@ -44,7 +44,7 @@ class AgentManagement(rio.Component):
                 rio.Text("Agents"),
                 rio.Dropdown(
                     label="Select an agent",
-                    options=[{agent["name"]} for agent in agents],
+                    options=[agent["name"] for agent in agents],
                     selected_value=selected_agent,
                     on_change=handle_agent_change,
                 ),
@@ -57,7 +57,7 @@ class AgentManagement(rio.Component):
             rio.Text("Providers"),
             rio.Dropdown(
                 label="Select a provider",
-                options=[{provider} for provider in providers],
+                options=[provider for provider in providers],
                 selected_value=selected_provider,
                 on_change=handle_provider_change,
             ),
