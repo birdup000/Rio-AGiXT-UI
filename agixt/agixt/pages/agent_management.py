@@ -11,17 +11,14 @@ api_key = "your_agixt_api_key"
 ApiClient = AGiXTSDK(base_uri=base_uri, api_key=api_key)
 
 def prompt_selection(prompt, show_user_input):
-    # Dummy function to replace undefined `prompt_selection`
     # Implement this function based on your requirements
     return {}
 
 def chain_selection(prompt, show_user_input):
-    # Dummy function to replace undefined `chain_selection`
     # Implement this function based on your requirements
     return {}
 
 def command_selection(prompt, show_user_input):
-    # Dummy function to replace undefined `command_selection`
     # Implement this function based on your requirements
     return {}
 
@@ -46,11 +43,38 @@ class AgentManagement(rio.Component):
         return provider_settings
 
     def build(self) -> rio.Component:
-        agents = ApiClient.get_agents()
-        selected_agent = agents[0]["name"] if agents else "Select an agent"
-        providers = ApiClient.get_providers()
+        def log_error(message: str):
+            print(f"Error: {message}")  # Simple logging function for debugging
+
+        try:
+            agents = ApiClient.get_agents()
+            if isinstance(agents, str):
+                raise TypeError("Response from get_agents() is a string, expected a list of dictionaries.")
+        except Exception as e:
+            log_error(f"Error fetching agents: {e}")
+            agents = []
+
+        try:
+            providers = ApiClient.get_providers()
+        except Exception as e:
+            log_error(f"Error fetching providers: {e}")
+            providers = []
+
+        try:
+            extensions = ApiClient.get_extensions()
+            if isinstance(extensions, str):
+                raise TypeError("Response from get_extensions() is a string, expected a list of dictionaries.")
+        except Exception as e:
+            log_error(f"Error fetching extensions: {e}")
+            extensions = []
+
+        if agents:
+            selected_agent = agents[0].get("name", "Select an agent")
+        else:
+            selected_agent = "Select an agent"
+            agents = [{"name": "No agents available"}]
+
         selected_provider = providers[0] if providers else "Select a provider"
-        extensions = ApiClient.get_extensions()
 
         def handle_agent_change(value):
             nonlocal selected_agent
@@ -69,7 +93,7 @@ class AgentManagement(rio.Component):
         if agent_action.selected_value == "Create Agent":
             agent_name = rio.TextInput("", label="Enter the agent name:")
         else:
-            agent_names = [agent["name"] for agent in ApiClient.get_agents()]
+            agent_names = [agent.get("name", "Unnamed agent") for agent in agents]
             agent_name = rio.Dropdown(
                 label="Select an agent:",
                 options=agent_names,
@@ -90,7 +114,7 @@ class AgentManagement(rio.Component):
         language_providers = ApiClient.get_providers_by_service("llm")
         selected_language_provider = rio.Dropdown(
             label="Select language provider:",
-            options=language_providers,
+            options=language_providers if language_providers else ["No providers"],
             selected_value=agent_settings.get("provider", language_providers[0] if language_providers else ""),  # Set a default selected value
         )
         provider_settings = self.render_provider_settings(
@@ -99,7 +123,7 @@ class AgentManagement(rio.Component):
             provider_settings,
         )
 
-        vision_providers = ["None"] + ApiClient.get_providers_by_service("vision")
+        vision_providers = ["None"] + (ApiClient.get_providers_by_service("vision") or [])
         selected_vision_provider = rio.Dropdown(
             label="Select vision provider:",
             options=vision_providers,
@@ -112,7 +136,7 @@ class AgentManagement(rio.Component):
                 provider_settings,
             )
 
-        tts_providers = ["None"] + ApiClient.get_providers_by_service("tts")
+        tts_providers = ["None"] + (ApiClient.get_providers_by_service("tts") or [])
         selected_tts_provider = rio.Dropdown(
             label="Select text to speech provider:",
             options=tts_providers,
@@ -124,10 +148,10 @@ class AgentManagement(rio.Component):
             provider_settings,
         )
 
-        stt_providers = ApiClient.get_providers_by_service("transcription")
+        stt_providers = ApiClient.get_providers_by_service("transcription") or []
         selected_stt_provider = rio.Dropdown(
             label="Select speech to text provider:",
-            options=stt_providers,
+            options=stt_providers if stt_providers else ["No providers"],
             selected_value=agent_settings.get("transcription_provider", stt_providers[0] if stt_providers else ""),  # Set a default selected value
         )
         provider_settings = self.render_provider_settings(
@@ -136,7 +160,7 @@ class AgentManagement(rio.Component):
             provider_settings,
         )
 
-        image_providers = ["None"] + ApiClient.get_providers_by_service("image")
+        image_providers = ["None"] + (ApiClient.get_providers_by_service("image") or [])
         selected_img_provider = agent_settings.get("image_provider", "None")
         selected_image_provider = rio.Dropdown(
             label="Select image generation provider:",
@@ -150,25 +174,23 @@ class AgentManagement(rio.Component):
                 provider_settings,
             )
 
-        embedding_providers = ApiClient.get_providers_by_service("embeddings")
+        embedding_providers = ApiClient.get_providers_by_service("embeddings") or []
         selected_embedding_provider = rio.Dropdown(
             label="Select embeddings provider:",
-            options=embedding_providers,
+            options=embedding_providers if embedding_providers else ["No providers"],
             selected_value=agent_settings.get("embeddings_provider", embedding_providers[0] if embedding_providers else ""),  # Set a default selected value
         )
 
-        extensions = ApiClient.get_extensions()
-        
         # Create a dictionary to store the selected state of each extension
         selected_extensions = {extension["extension_name"]: False for extension in extensions}
-        
+
         # Update the selected state based on enabled commands
         for extension in extensions:
             for command in extension["commands"]:
                 if agent_commands.get(command["friendly_name"], False):
                     selected_extensions[extension["extension_name"]] = True
                     break
-        
+
         # Create a list of Switch components for each extension
         extension_switches = [
             rio.Column(
@@ -201,7 +223,7 @@ class AgentManagement(rio.Component):
 
         helper_agent = rio.Dropdown(
             label="Select Helper Agent (Your agent may ask the selected one for help when it needs something.)",
-            options=[agent["name"] for agent in ApiClient.get_agents()],
+            options=[agent.get("name", "Unnamed agent") for agent in agents],
             selected_value=agent_config.get("helper_agent_name", ""),
         )
 
@@ -265,7 +287,7 @@ class AgentManagement(rio.Component):
                 response = ApiClient.add_agent(
                     agent_name=agent_name.value, settings=settings, commands=commands
                 )
-                rio.info(f"Agent '{agent_name.value}' created.")
+                print(f"Agent '{agent_name.value}' created.")
             elif agent_action.selected_value == "Modify Agent":
                 response = ApiClient.update_agent_settings(
                     agent_name=agent_name.value, settings=settings
@@ -273,10 +295,10 @@ class AgentManagement(rio.Component):
                 response = ApiClient.update_agent_commands(
                     agent_name=agent_name.value, commands=commands
                 )
-                rio.info(f"Agent '{agent_name.value}' updated.")
+                print(f"Agent '{agent_name.value}' updated.")
             elif agent_action.selected_value == "Delete Agent":
                 response = ApiClient.delete_agent(agent_name.value)
-                rio.info(f"Agent '{agent_name.value}' deleted.")
+                print(f"Agent '{agent_name.value}' deleted.")
 
         return rio.Column(
             rio.Column(
@@ -333,7 +355,7 @@ class AgentManagement(rio.Component):
                 rio.Row(
                     rio.Column(
                         rio.Markdown("### Extensions"),
-                        rio.Dropdown(options=[ext for ext in selected_extensions.keys()], selected_value=next(iter(selected_extensions))),
+                        rio.Dropdown(options=[ext for ext in selected_extensions.keys()], selected_value=next(iter(selected_extensions), "No extensions")),
                         *extension_switches,
                         *extension_settings.values(),
                     ),
