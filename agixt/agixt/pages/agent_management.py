@@ -29,10 +29,11 @@ class MultiSelect(rio.Component):
         self._is_open = not self._is_open
 
     def _toggle_selection(self, option: str) -> None:
-        if option in self.selected:
-            self.selected.remove(option)
+        extension_name = option.split(" (")[0]
+        if extension_name in self.selected:
+            self.selected.remove(extension_name)
         else:
-            self.selected.add(option)
+            self.selected.add(extension_name)
 
     def build(self) -> rio.Component:
         return rio.Popup(
@@ -64,6 +65,8 @@ class AgentManagement(rio.Component):
     """
     Agent Management
     """
+
+    selected: set[str] = set()
 
     def render_provider_settings(self, provider_name, agent_settings, provider_settings):
         settings = ApiClient.get_provider_settings(provider_name=provider_name)
@@ -177,17 +180,12 @@ class AgentManagement(rio.Component):
             selected_value=agent_settings.get("embeddings_provider", embedding_providers[0] if embedding_providers else ""),
         )
 
-        selected_extensions = {extension["extension_name"]: False for extension in extensions}
+        selected_extensions = {f"{extension['extension_name']} ({', '.join(extension['settings'])})": False for extension in extensions}
         for extension in extensions:
-            for command in extension["commands"]:
-                if agent_commands.get(command["friendly_name"], False):
-                    selected_extensions[extension["extension_name"]] = True
-                    break
-
-        multi_select_extension = MultiSelect(
-            options=[ext["extension_name"] for ext in extensions],
-            selected=set(selected_extensions.keys())
-        )
+            extension_name = f"{extension['extension_name']} ({', '.join(extension['settings'])})"
+            if extension_name in self.selected:
+                selected_extensions[extension_name] = True
+                break
 
         extension_settings = {
             setting: rio.TextInput(
@@ -195,9 +193,15 @@ class AgentManagement(rio.Component):
                 label=f"{setting}:",
             )
             for extension in extensions
-            if selected_extensions.get(extension["extension_name"], False)
+            if selected_extensions.get(f"{extension['extension_name']} ({', '.join(extension['settings'])})", False)
             for setting in extension["settings"]
         }
+
+        multi_select_extension = MultiSelect(
+            options=[f"{ext['extension_name']} ({', '.join(ext['settings'])})" for ext in extensions],
+            selected=set(selected_extensions.keys())
+        )
+
 
         selected_commands = [
             command["friendly_name"]
