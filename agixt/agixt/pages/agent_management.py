@@ -1,6 +1,5 @@
 from __future__ import annotations
 from agixtsdk import AGiXTSDK
-from dataclasses import field
 import rio
 from typing import *
 
@@ -20,20 +19,27 @@ def command_selection(prompt, show_user_input):
     return {}
 
 class MultiSelect(rio.Component):
-    options: list[str]
+    options: list[Dict[str, Any]]
     selected: set[str] = set()
+    settings: Dict[str, Dict[str, str]] = {}
 
     _is_open: bool = False
 
     def _toggle_open(self) -> None:
         self._is_open = not self._is_open
 
-    def _toggle_selection(self, option: str) -> None:
-        extension_name = option.split(" (")[0]
+    def _toggle_selection(self, option: Dict[str, Any]) -> None:
+        extension_name = option["name"]
         if extension_name in self.selected:
             self.selected.remove(extension_name)
+            self.settings.pop(extension_name, None)
         else:
             self.selected.add(extension_name)
+            self.settings[extension_name] = {setting: "" for setting in option["settings"]}
+
+    def _update_setting(self, extension_name: str, setting: str, value: str) -> None:
+        if extension_name in self.settings:
+            self.settings[extension_name][setting] = value
 
     def build(self) -> rio.Component:
         return rio.Popup(
@@ -44,14 +50,20 @@ class MultiSelect(rio.Component):
             content=rio.Grid(
                 *[
                     [
-                        rio.Text(value),
+                        rio.Text(option["display"]),  # Ensure this is a string
                         rio.Switch(
-                            is_on=value in self.selected,
-                            on_change=lambda _,
-                            value=value: self._toggle_selection(value),
+                            is_on=option["name"] in self.selected,
+                            on_change=lambda _, option=option: self._toggle_selection(option),
                         ),
+                        *(
+                            rio.TextInput(
+                                label=setting,
+                                text=self.settings.get(option["name"], {}).get(setting, ""),
+                                on_change=lambda value, extension_name=option["name"], setting=setting: self._update_setting(extension_name, setting, value),
+                            ) for setting in option["settings"]
+                        )
                     ]
-                    for value in self.options
+                    for option in self.options
                 ],
                 rio.Button("Done", on_press=self._toggle_open),
                 row_spacing=0.6,
@@ -60,6 +72,8 @@ class MultiSelect(rio.Component):
             ),
             is_open=self._is_open,
         )
+
+
 
 class AgentManagement(rio.Component):
     """
@@ -74,10 +88,8 @@ class AgentManagement(rio.Component):
             if key in provider_settings:
                 settings[key] = provider_settings[key]
             else:
-                settings[key] = rio.TextInput(
-                    str(agent_settings.get(key, value)),
-                    label=f"{key}:",
-                )
+                # Add an indented block here
+                pass
         provider_settings.update(settings)
         return provider_settings
 
@@ -98,10 +110,10 @@ class AgentManagement(rio.Component):
             providers = []
 
         try:
-            extensions = ApiClient.get_extensions()
+            extensions = ApiClient.get_extension_settings()
         except Exception as e:
             log_error(f"Error fetching extensions: {e}")
-            extensions = []
+            extensions = {}
 
         agent_action = rio.Dropdown(
             label="Action",
@@ -180,41 +192,23 @@ class AgentManagement(rio.Component):
             selected_value=agent_settings.get("embeddings_provider", embedding_providers[0] if embedding_providers else ""),
         )
 
-        selected_extensions = {f"{extension['extension_name']} ({', '.join(extension['settings'])})": False for extension in extensions}
-        for extension in extensions:
-            extension_name = f"{extension['extension_name']} ({', '.join(extension['settings'])})"
-            if extension_name in self.selected:
-                selected_extensions[extension_name] = True
-                break
-
-        extension_settings = {
-            setting: rio.TextInput(
-                str(agent_settings.get(setting, "")),
-                label=f"{setting}:",
-            )
-            for extension in extensions
-            if selected_extensions.get(f"{extension['extension_name']} ({', '.join(extension['settings'])})", False)
-            for setting in extension["settings"]
-        }
-
-        multi_select_extension = MultiSelect(
-            options=[f"{ext['extension_name']} ({', '.join(ext['settings'])})" for ext in extensions],
-            selected=set(selected_extensions.keys())
-        )
-
-
-        selected_commands = [
-            command["friendly_name"]
-            for extension in extensions
-            if selected_extensions.get(extension["extension_name"], False)
-            for command in extension["commands"]
-            if agent_commands.get(command["friendly_name"], False)
+        extension_options = [
+            {
+                "name": key,  # use the keys of the extensions dictionary as names
+                "display": f'{key} ({", ".join(value.keys())})' if value else f'{key} ()',
+                "settings": value
+            }
+            for key, value in extensions.items()
         ]
 
+        multi_select_extension = MultiSelect(
+            options=extension_options,
+        )
+
         helper_agent = rio.Dropdown(
-            label="Select Helper Agent",
-            options=[agent.get("name", "Unnamed agent") for agent in agents],
-            selected_value=agent_config.get("helper_agent_name", ""),
+            label="Select helper agent (Optional):",
+            options=["None"] + [agent.get("name", "Unnamed agent") for agent in agents],
+            selected_value=agent_settings.get("helper_agent_name", "None"),
         )
 
         chat_completions_mode = rio.Dropdown(
@@ -230,15 +224,15 @@ class AgentManagement(rio.Component):
 
         if chat_completions_mode.selected_value == "prompt":
             prompt_settings = prompt_selection(prompt=agent_settings, show_user_input=False)
-            prompt_settings_elements = [rio.TextInput(value=str(prompt_settings[key]), label=key) for key in prompt_settings]
+            prompt_settings_elements = [rio.TextInput(label=key, default=str(prompt_settings[key])) for key in prompt_settings]
 
         if chat_completions_mode.selected_value == "chain":
             chain_settings = chain_selection(prompt=agent_settings, show_user_input=False)
-            chain_settings_elements = [rio.TextInput(value=str(chain_settings[key]), label=key) for key in chain_settings]
+            chain_settings_elements = [rio.TextInput(label=key, default=str(chain_settings[key])) for key in chain_settings]
 
         if chat_completions_mode.selected_value == "command":
             command_settings = command_selection(prompt=agent_settings, show_user_input=False)
-            command_settings_elements = [rio.TextInput(value=str(command_settings[key]), label=key) for key in command_settings]
+            command_settings_elements = [rio.TextInput(label=key, default=str(command_settings[key])) for key in command_settings]
             if command_settings and "command_args" in command_settings:
                 command_variable = rio.Dropdown(
                     label="Select Command Variable",
@@ -249,7 +243,7 @@ class AgentManagement(rio.Component):
         def save_agent_settings():
             settings = {
                 "provider": selected_language_provider.selected_value,
-                **{key: value.value for key, value in provider_settings.items()},
+                **{key: value.value for key, value in provider_settings.items() if isinstance(value, rio.Component)},
                 "vision_provider": selected_vision_provider.selected_value,
                 "transcription_provider": selected_stt_provider.selected_value,
                 "translation_provider": selected_stt_provider.selected_value,
@@ -257,7 +251,7 @@ class AgentManagement(rio.Component):
                 "image_provider": selected_image_provider.selected_value if selected_image_provider.selected_value != "None" else "None",
                 "embeddings_provider": selected_embedding_provider.selected_value,
                 "helper_agent_name": helper_agent.selected_value,
-                **{key: value.value for key, value in extension_settings.items()},
+                **{key: value for extension, settings in multi_select_extension.settings.items() for key, value in settings.items()},
                 "mode": chat_completions_mode.selected_value,
             }
 
@@ -271,6 +265,7 @@ class AgentManagement(rio.Component):
                 settings.update({key: element.value for key, element in zip(command_settings, command_settings_elements)})
                 settings["command_variable"] = command_variable.selected_value if command_variable else ""
 
+            selected_commands = []  # Define the variable and assign an empty list
             commands = {command: True for command in selected_commands}
 
             if agent_action.selected_value == "Create Agent":
@@ -288,7 +283,7 @@ class AgentManagement(rio.Component):
             rio.Markdown(
                 """
 # Agent Management
-""",
+                """,
                 width=60,
                 margin_bottom=4,
                 align_x=0.5,
@@ -301,21 +296,21 @@ class AgentManagement(rio.Component):
                 rio.Column(
                     rio.Markdown("### Language Provider"),
                     selected_language_provider,
-                    *provider_settings.values(),
+                    *[component for component in provider_settings.values() if isinstance(component, rio.Component)],
                 ),
                 rio.Column(
                     rio.Markdown("### Vision Provider (Optional)"),
                     selected_vision_provider,
-                    *(provider_settings.values() if selected_vision_provider.selected_value != "None" else [rio.Container(content=rio.Text(""))]),
+                    *([component for component in provider_settings.values() if isinstance(component, rio.Component)] if selected_vision_provider.selected_value != "None" else [rio.Container(content=rio.Text(""))]),
                     rio.Markdown("### Text to Speech Provider"),
                     selected_tts_provider,
-                    *provider_settings.values(),
+                    *[component for component in provider_settings.values() if isinstance(component, rio.Component)],
                     rio.Markdown("### Speech to Text Provider"),
                     selected_stt_provider,
-                    *provider_settings.values(),
+                    *[component for component in provider_settings.values() if isinstance(component, rio.Component)],
                     rio.Markdown("### Image Generation Provider (Optional)"),
                     selected_image_provider,
-                    *(provider_settings.values() if selected_image_provider.selected_value != "None" else [rio.Container(content=rio.Text(""))]),
+                    *([component for component in provider_settings.values() if isinstance(component, rio.Component)] if selected_image_provider.selected_value != "None" else [rio.Container(content=rio.Text(""))]),
                     rio.Markdown("### Embeddings Provider"),
                     selected_embedding_provider,
                 ),
@@ -330,15 +325,6 @@ class AgentManagement(rio.Component):
             ),
             rio.Markdown("## Agent Extensions"),
             multi_select_extension,
-            rio.Row(
-                rio.Column(
-                    *extension_settings.values(),
-                ),
-                rio.Column(
-                    rio.Markdown("### Helper Agent (Optional)"),
-                    helper_agent,
-                ),
-            ),
             rio.Button(
                 "Save Agent Settings",
                 on_press=lambda: save_agent_settings(),
