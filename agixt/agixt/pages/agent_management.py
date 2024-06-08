@@ -18,8 +18,6 @@ def chain_selection(prompt, show_user_input):
 def command_selection(prompt, show_user_input):
     return {}
 
-from typing import Any, Dict, List, Set
-
 class MultiSelect(rio.Component):
     options: List[Dict[str, Any]]
     selected: Set[str] = set()
@@ -38,37 +36,38 @@ class MultiSelect(rio.Component):
         else:
             self.selected.add(extension_name)
             self.settings[extension_name] = {setting: "" for setting in option["settings"]}
+        self.force_refresh()  # Force refresh to update the text
 
     def _update_setting(self, extension_name: str, setting: str, value: str) -> None:
         if extension_name in self.settings:
             self.settings[extension_name][setting] = value
 
     def _create_option_row(self, option: Dict[str, Any]) -> rio.Component:
-        return rio.Column(
+        result = rio.Column(
             rio.Row(
                 rio.Text(option["display"], justify='left'),  # Removed explicit width
                 rio.Switch(
                     is_on=option["name"] in self.selected,
                     on_change=lambda _, opt=option: self._toggle_selection(opt),
                 ),
+                rio.Text("Enabled" if option["name"] in self.selected else "Disabled"),  # Added text
             ),
-            self._create_settings_column(option),
             spacing=0.3,  # Reduced spacing for more compact look
         )
 
-    def _create_settings_column(self, option: Dict[str, Any]) -> rio.Component:
-        return rio.Column(
-            *[
-                rio.Row(
-                    rio.Text(setting),
-                    rio.TextInput(
-                        text=self.settings.get(option["name"], {}).get(setting, ""),
-                        on_change=lambda value, ext_name=option["name"], setting=setting: self._update_setting(ext_name, setting, value)
-                    ),
-                ) for setting in option["settings"]
-            ],
-            spacing=0.2,  # Reduced spacing for better compactness
-        )
+        if option["name"] in self.selected:
+            for setting in option["settings"]:
+                result.add(
+                    rio.Row(
+                        rio.Text(setting),
+                        rio.TextInput(
+                            text=self.settings.get(option["name"], {}).get(setting, ""),
+                            on_change=lambda value, ext_name=option["name"], setting=setting: self._update_setting(ext_name, setting, value)
+                        ),
+                    )
+                )
+
+        return result
 
     def build(self) -> rio.Component:
         return rio.Popup(
@@ -94,9 +93,6 @@ class MultiSelect(rio.Component):
             ),
             is_open=self._is_open,
         )
-
-
-
 
 
 
