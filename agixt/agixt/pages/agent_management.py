@@ -18,9 +18,11 @@ def chain_selection(prompt, show_user_input):
 def command_selection(prompt, show_user_input):
     return {}
 
+from typing import Any, Dict, List, Set
+
 class MultiSelect(rio.Component):
-    options: list[Dict[str, Any]]
-    selected: set[str] = set()
+    options: List[Dict[str, Any]]
+    selected: Set[str] = set()
     settings: Dict[str, Dict[str, str]] = {}
 
     _is_open: bool = False
@@ -41,6 +43,33 @@ class MultiSelect(rio.Component):
         if extension_name in self.settings:
             self.settings[extension_name][setting] = value
 
+    def _create_option_row(self, option: Dict[str, Any]) -> rio.Component:
+        return rio.Column(
+            rio.Row(
+                rio.Text(option["display"], justify='left'),  # Removed explicit width
+                rio.Switch(
+                    is_on=option["name"] in self.selected,
+                    on_change=lambda _, opt=option: self._toggle_selection(opt),
+                ),
+            ),
+            self._create_settings_column(option),
+            spacing=0.3,  # Reduced spacing for more compact look
+        )
+
+    def _create_settings_column(self, option: Dict[str, Any]) -> rio.Component:
+        return rio.Column(
+            *[
+                rio.Row(
+                    rio.Text(setting),
+                    rio.TextInput(
+                        text=self.settings.get(option["name"], {}).get(setting, ""),
+                        on_change=lambda value, ext_name=option["name"], setting=setting: self._update_setting(ext_name, setting, value)
+                    ),
+                ) for setting in option["settings"]
+            ],
+            spacing=0.2,  # Reduced spacing for better compactness
+        )
+
     def build(self) -> rio.Component:
         return rio.Popup(
             anchor=rio.Button(
@@ -50,36 +79,18 @@ class MultiSelect(rio.Component):
             content=rio.ScrollContainer(
                 content=rio.Column(
                     *[
-                        rio.Row(
-                            rio.Text(option["display"], width=15, justify='left'),  # Set appropriate width for text
-                            rio.Switch(
-                                is_on=option["name"] in self.selected,
-                                on_change=lambda _, option=option: self._toggle_selection(option),
-                            ),
-                            rio.Column(
-                                *[
-                                    rio.TextInput(
-                                        label=setting,
-                                        text=self.settings.get(option["name"], {}).get(setting, ""),
-                                        on_change=lambda value, extension_name=option["name"], setting=setting: self._update_setting(extension_name, setting, value),
-                                        width=20  # Set appropriate width for TextInput
-                                    ) for setting in option["settings"]
-                                ],
-                                spacing=0.3,
-                            ),
-                            spacing=0.6,
-                        ) for option in self.options
+                        self._create_option_row(option) for option in self.options
                     ] + [rio.Button("Done", on_press=self._toggle_open)],
-                    spacing=0.6,
+                    spacing=0.3,
                     margin=0.5,
                 ),
-                scroll_y='auto',
-                scroll_x='auto',
-                height=20,  # Set appropriate height for the scroll container
-                width=70,   # Set appropriate width for the scroll container
-                margin=1,  # Add some margin around the scroll container
-                align_x=0.5,  # Center horizontally
-                align_y=0.5   # Center vertically
+                scroll_y='always',
+                scroll_x='never',
+                height=50,
+                width=100,
+                margin=0.5,
+                align_x=0.5,
+                align_y=0.5,
             ),
             is_open=self._is_open,
         )
