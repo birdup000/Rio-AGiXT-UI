@@ -48,28 +48,29 @@ class MultiSelect(rio.Component):
                 on_press=self._toggle_open,
             ),
             content=rio.ScrollContainer(
-                content=rio.Grid(
+                content=rio.Column(
                     *[
-                        [
+                        rio.Row(
                             rio.Text(option["display"], width=15, justify='left'),  # Set appropriate width for text
                             rio.Switch(
                                 is_on=option["name"] in self.selected,
                                 on_change=lambda _, option=option: self._toggle_selection(option),
                             ),
-                            *(
-                                rio.TextInput(
-                                    label=setting,
-                                    text=self.settings.get(option["name"], {}).get(setting, ""),
-                                    on_change=lambda value, extension_name=option["name"], setting=setting: self._update_setting(extension_name, setting, value),
-                                    width=20  # Set appropriate width for TextInput
-                                ) for setting in option["settings"]
-                            )
-                        ]
-                        for option in self.options
-                    ],
-                    rio.Button("Done", on_press=self._toggle_open),
-                    row_spacing=0.6,
-                    column_spacing=0.6,
+                            rio.Column(
+                                *[
+                                    rio.TextInput(
+                                        label=setting,
+                                        text=self.settings.get(option["name"], {}).get(setting, ""),
+                                        on_change=lambda value, extension_name=option["name"], setting=setting: self._update_setting(extension_name, setting, value),
+                                        width=20  # Set appropriate width for TextInput
+                                    ) for setting in option["settings"]
+                                ],
+                                spacing=0.3,
+                            ),
+                            spacing=0.6,
+                        ) for option in self.options
+                    ] + [rio.Button("Done", on_press=self._toggle_open)],
+                    spacing=0.6,
                     margin=0.5,
                 ),
                 scroll_y='auto',
