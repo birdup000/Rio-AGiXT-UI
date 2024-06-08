@@ -2,6 +2,7 @@ from __future__ import annotations
 from agixtsdk import AGiXTSDK
 import rio
 from typing import *
+import asyncio
 
 # Initialize API Client
 base_uri = "http://localhost:7437"
@@ -18,6 +19,8 @@ def chain_selection(prompt, show_user_input):
 def command_selection(prompt, show_user_input):
     return {}
 
+
+
 class MultiSelect(rio.Component):
     options: List[Dict[str, Any]]
     selected: Set[str] = set()
@@ -25,11 +28,11 @@ class MultiSelect(rio.Component):
 
     _is_open: bool = False
 
-    def _toggle_open(self) -> None:
+    async def _toggle_open(self) -> None:
         self._is_open = not self._is_open
-        self.force_refresh()  # Force refresh to update the popup state
+        await self.force_refresh()  # Force refresh to update the popup state
 
-    def _toggle_selection(self, option: Dict[str, Any]) -> None:
+    async def _toggle_selection(self, option: Dict[str, Any]) -> None:
         extension_name = option["name"]
         if extension_name in self.selected:
             self.selected.remove(extension_name)
@@ -37,58 +40,75 @@ class MultiSelect(rio.Component):
         else:
             self.selected.add(extension_name)
             self.settings[extension_name] = {setting: "" for setting in option["settings"]}
-        self._is_open = True  # Set _is_open to True to reopen the popup
-        self.force_refresh()  # Force refresh to update the popup state
+        await self.force_refresh()  # Force refresh to update the popup state
 
     def _update_setting(self, extension_name: str, setting: str, value: str) -> None:
         if extension_name in self.settings:
             self.settings[extension_name][setting] = value
 
     def build(self) -> rio.Component:
-        result = rio.Column()
+        grid = rio.Grid(row_spacing=1, column_spacing=1)
+        
+        row_index = 0
 
-        for option in self.options:
-            row = rio.Row(
+        for index, option in enumerate(self.options):
+            grid.add(
                 rio.Text(option["display"], justify='left'),  # Removed explicit width
+                row=row_index, column=0
+            )
+            grid.add(
                 rio.Switch(
                     is_on=option["name"] in self.selected,
-                    on_change=lambda _, opt=option: self._toggle_selection(opt),
+                    on_change=lambda _, opt=option: asyncio.create_task(self._toggle_selection(opt)),
                 ),
-                rio.Text("Enabled" if option["name"] in self.selected else "Disabled"),  # Added text
+                row=row_index, column=1
             )
-            result.add(row)
+            grid.add(
+                rio.Text("Enabled" if option["name"] in self.selected else "Disabled"),  # Added text
+                row=row_index, column=2
+            )
+
+            row_index += 1
 
             if option["name"] in self.selected:
                 for setting in option["settings"]:
-                    setting_row = rio.Row(
+                    grid.add(
                         rio.Text(setting),
+                        row=row_index, column=0
+                    )
+                    grid.add(
                         rio.TextInput(
                             text=self.settings.get(option["name"], {}).get(setting, ""),
                             on_change=lambda value, ext_name=option["name"], setting=setting: self._update_setting(ext_name, setting, value)
                         ),
+                        row=row_index, column=1, width=2
                     )
-                    result.add(setting_row)
+                    row_index += 1
 
-        done_button = rio.Button("Done", on_press=self._toggle_open)
-        result.add(done_button)
-
+        done_button = rio.Button("Done", on_press=lambda: asyncio.create_task(self._toggle_open()))
+        grid.add(done_button, row=row_index, column=0, width=3)
+        
         return rio.Popup(
             anchor=rio.Button(
                 "Edit Selection",
-                on_press=self._toggle_open,
+                on_press=lambda: asyncio.create_task(self._toggle_open()),
             ),
             content=rio.ScrollContainer(
-                content=result,
+                content=grid,
                 scroll_y='always',
                 scroll_x='never',
                 height=50,
                 width=100,
                 margin=0.5,
-                align_x=0.5,
-                align_y=0.5,
             ),
             is_open=self._is_open,
+            alignment=0.5,
+            gap=0.5,
+            width='grow',
+            height='grow',
         )
+
+
 
 class AgentManagement(rio.Component):
     """
