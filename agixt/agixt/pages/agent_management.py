@@ -27,6 +27,7 @@ class MultiSelect(rio.Component):
 
     def _toggle_open(self) -> None:
         self._is_open = not self._is_open
+        self.force_refresh()  # Force refresh to update the popup state
 
     def _toggle_selection(self, option: Dict[str, Any]) -> None:
         extension_name = option["name"]
@@ -36,53 +37,48 @@ class MultiSelect(rio.Component):
         else:
             self.selected.add(extension_name)
             self.settings[extension_name] = {setting: "" for setting in option["settings"]}
-        self.force_refresh()  # Force refresh to update the text
+        self._is_open = True  # Set _is_open to True to reopen the popup
+        self.force_refresh()  # Force refresh to update the popup state
 
     def _update_setting(self, extension_name: str, setting: str, value: str) -> None:
         if extension_name in self.settings:
             self.settings[extension_name][setting] = value
 
-    def _create_option_row(self, option: Dict[str, Any]) -> rio.Component:
-        result = rio.Column(
-            rio.Row(
+    def build(self) -> rio.Component:
+        result = rio.Column()
+
+        for option in self.options:
+            row = rio.Row(
                 rio.Text(option["display"], justify='left'),  # Removed explicit width
                 rio.Switch(
                     is_on=option["name"] in self.selected,
                     on_change=lambda _, opt=option: self._toggle_selection(opt),
                 ),
                 rio.Text("Enabled" if option["name"] in self.selected else "Disabled"),  # Added text
-            ),
-            spacing=0.3,  # Reduced spacing for more compact look
-        )
+            )
+            result.add(row)
 
-        if option["name"] in self.selected:
-            for setting in option["settings"]:
-                result.add(
-                    rio.Row(
+            if option["name"] in self.selected:
+                for setting in option["settings"]:
+                    setting_row = rio.Row(
                         rio.Text(setting),
                         rio.TextInput(
                             text=self.settings.get(option["name"], {}).get(setting, ""),
                             on_change=lambda value, ext_name=option["name"], setting=setting: self._update_setting(ext_name, setting, value)
                         ),
                     )
-                )
+                    result.add(setting_row)
 
-        return result
+        done_button = rio.Button("Done", on_press=self._toggle_open)
+        result.add(done_button)
 
-    def build(self) -> rio.Component:
         return rio.Popup(
             anchor=rio.Button(
                 "Edit Selection",
                 on_press=self._toggle_open,
             ),
             content=rio.ScrollContainer(
-                content=rio.Column(
-                    *[
-                        self._create_option_row(option) for option in self.options
-                    ] + [rio.Button("Done", on_press=self._toggle_open)],
-                    spacing=0.3,
-                    margin=0.5,
-                ),
+                content=result,
                 scroll_y='always',
                 scroll_x='never',
                 height=50,
@@ -93,8 +89,6 @@ class MultiSelect(rio.Component):
             ),
             is_open=self._is_open,
         )
-
-
 
 class AgentManagement(rio.Component):
     """
