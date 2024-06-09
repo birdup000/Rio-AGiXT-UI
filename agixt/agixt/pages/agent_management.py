@@ -47,13 +47,20 @@ class MultiSelect(rio.Component):
             self.settings[extension_name][setting] = value
 
     def build(self) -> rio.Component:
-        grid = rio.Grid(row_spacing=1, column_spacing=1)
-        
+        grid = rio.Grid(row_spacing=0.4, column_spacing=0.5)  # Increased spacing for better readability
+
         row_index = 0
 
-        for index, option in enumerate(self.options):
+        for option in self.options:
             grid.add(
-                rio.Text(option["display"], justify='left'),  # Removed explicit width
+                rio.Text(
+                    option["display"],
+                    justify='left',
+                    style=rio.TextStyle(
+                        font_weight='bold',
+                        fill=rio.Color.from_hex("#333")
+                    )
+                ),  # Text styling
                 row=row_index, column=0
             )
             grid.add(
@@ -63,8 +70,15 @@ class MultiSelect(rio.Component):
                 ),
                 row=row_index, column=1
             )
+            status_text = "🌟 Enabled" if option["name"] in self.selected else "🔒 Disabled"  # Emoji for better visualization
             grid.add(
-                rio.Text("Enabled" if option["name"] in self.selected else "Disabled"),  # Added text
+                rio.Text(
+                    status_text,
+                    style=rio.TextStyle(
+                        italic=True,
+                        fill=rio.Color.from_hex("#666")
+                    )
+                ),  # Text styling
                 row=row_index, column=2
             )
 
@@ -73,40 +87,58 @@ class MultiSelect(rio.Component):
             if option["name"] in self.selected:
                 for setting in option["settings"]:
                     grid.add(
-                        rio.Text(setting),
+                        rio.Text(
+                            f"⚙️ {setting}",
+                            style=rio.TextStyle(
+                                fill=rio.Color.from_hex("#007bff")
+                            )
+                        ),  # Styled settings text
                         row=row_index, column=0
                     )
                     grid.add(
                         rio.TextInput(
                             text=self.settings.get(option["name"], {}).get(setting, ""),
-                            on_change=lambda value, ext_name=option["name"], setting=setting: self._update_setting(ext_name, setting, value)
+                            on_change=lambda value, ext_name=option["name"], setting=setting: self._update_setting(ext_name, setting, value),
                         ),
                         row=row_index, column=1, width=2
                     )
                     row_index += 1
 
-        done_button = rio.Button("Done", on_press=lambda: asyncio.create_task(self._toggle_open()))
+        done_button = rio.Button(
+            "🛑 Done",
+            on_press=lambda: asyncio.create_task(self._toggle_open()),
+            style='major',  # Use predefined style
+        )
         grid.add(done_button, row=row_index, column=0, width=3)
-        
+
         return rio.Popup(
             anchor=rio.Button(
-                "Edit Selection",
+                "🛠 Edit Selection",
                 on_press=lambda: asyncio.create_task(self._toggle_open()),
+                style='major',  # Use predefined style
             ),
             content=rio.ScrollContainer(
                 content=grid,
                 scroll_y='always',
                 scroll_x='never',
-                height=50,
-                width=100,
-                margin=0.5,
+                height=40,  # Increased height for more content visibility
+                width=100,  # Adjusted width for better layout
+                margin=0.4,  # Increased margin for better spacing
             ),
             is_open=self._is_open,
             alignment=0.5,
-            gap=0.5,
+            gap=0.4,  # Increased gap for better spacing
             width='grow',
             height='grow',
         )
+
+
+
+
+
+
+
+
 
 
 
