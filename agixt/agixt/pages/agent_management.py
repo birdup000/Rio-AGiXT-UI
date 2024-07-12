@@ -310,7 +310,7 @@ class AgentManagement(rio.Component):
         def save_agent_settings():
             settings = {
                 "provider": selected_language_provider.selected_value,
-                **{key: value.value for key, value in provider_settings.items() if isinstance(value, rio.Component)},
+                **{key: value.text if isinstance(value, rio.TextInput) else value.selected_value for key, value in provider_settings.items() if isinstance(value, rio.Component)},
                 "vision_provider": selected_vision_provider.selected_value,
                 "transcription_provider": selected_stt_provider.selected_value,
                 "translation_provider": selected_stt_provider.selected_value,
@@ -323,28 +323,28 @@ class AgentManagement(rio.Component):
             }
 
             if chat_completions_mode.selected_value == "prompt":
-                settings.update({key: element.value for key, element in zip(prompt_settings, prompt_settings_elements)})
+                settings.update({key: element.text for key, element in zip(prompt_settings, prompt_settings_elements)})
 
             if chat_completions_mode.selected_value == "chain":
-                settings.update({key: element.value for key, element in zip(chain_settings, chain_settings_elements)})
+                settings.update({key: element.text for key, element in zip(chain_settings, chain_settings_elements)})
 
             if chat_completions_mode.selected_value == "command":
-                settings.update({key: element.value for key, element in zip(command_settings, command_settings_elements)})
+                settings.update({key: element.text for key, element in zip(command_settings, command_settings_elements)})
                 settings["command_variable"] = command_variable.selected_value if command_variable else ""
 
             selected_commands = []  # Define the variable and assign an empty list
             commands = {command: True for command in selected_commands}
 
             if agent_action.selected_value == "Create Agent":
-                response = ApiClient.add_agent(agent_name=agent_name.value, settings=settings, commands=commands)
-                print(f"Agent '{agent_name.value}' created.")
+                response = ApiClient.add_agent(agent_name=agent_name.text, settings=settings, commands=commands)
+                print(f"Agent '{agent_name.text}' created.")
             elif agent_action.selected_value == "Modify Agent":
-                response = ApiClient.update_agent_settings(agent_name=agent_name.value, settings=settings)
-                response = ApiClient.update_agent_commands(agent_name=agent_name.value, commands=commands)
-                print(f"Agent '{agent_name.value}' updated.")
+                response = ApiClient.update_agent_settings(agent_name=agent_name.selected_value, settings=settings)
+                response = ApiClient.update_agent_commands(agent_name=agent_name.selected_value, commands=commands)
+                print(f"Agent '{agent_name.selected_value}' updated.")
             elif agent_action.selected_value == "Delete Agent":
-                response = ApiClient.delete_agent(agent_name.value)
-                print(f"Agent '{agent_name.value}' deleted.")
+                response = ApiClient.delete_agent(agent_name.selected_value)
+                print(f"Agent '{agent_name.selected_value}' deleted.")
 
         return rio.Column(
             rio.Markdown(
