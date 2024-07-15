@@ -129,18 +129,30 @@ class AgentManagement(rio.Component):
     message: str = ""
     is_error: bool = False
 
+    def get_provider_settings_safe(self, provider_name):
+        try:
+            settings = ApiClient.get_provider_settings(provider_name=provider_name)
+            return settings if isinstance(settings, dict) else {}
+        except Exception as e:
+            print(f"Error getting provider settings for {provider_name}: {str(e)}")
+            return {}
+
     def render_provider_settings(self, provider_name, agent_settings, provider_settings):
-        settings = ApiClient.get_provider_settings(provider_name=provider_name)
-        for key, value in settings.items():
-            if key in provider_settings:
-                settings[key] = provider_settings[key]
-            else:
-                settings[key] = rio.TextInput(
-                    text=str(agent_settings.get(key, value)),
-                    label=f"{key}:",
-                )
-        provider_settings.update(settings)
-        return provider_settings
+        try:
+            settings = self.get_provider_settings_safe(provider_name)
+            for key, value in settings.items():
+                if key in provider_settings:
+                    settings[key] = provider_settings[key]
+                else:
+                    settings[key] = rio.TextInput(
+                        text=str(agent_settings.get(key, value)),
+                        label=f"{key}:",
+                    )
+            provider_settings.update(settings)
+            return provider_settings
+        except Exception as e:
+            print(f"Error rendering provider settings for {provider_name}: {str(e)}")
+            return provider_settings
 
     async def save_agent_settings(self, agent_action, agent_name, settings, commands):
         try:
@@ -253,7 +265,7 @@ class AgentManagement(rio.Component):
             selected_value=ApiClient.get_providers()[0] if ApiClient.get_providers() else "",
         )
 
-        agent_settings = ApiClient.get_provider_settings(agent_provider.selected_value)
+        agent_settings = self.get_provider_settings_safe(agent_provider.selected_value)
         selected_language_provider = rio.Dropdown(
             label="Language Provider",
             options=ApiClient.get_providers(),
@@ -431,8 +443,8 @@ class AgentManagement(rio.Component):
                 rio.Column(command_variable if chat_completions_mode.selected_value == "command" else rio.Container(content=rio.Text(""))),
             ),
             save_button,
-            rio.Text(
+            rio.Container(content=rio.Text(
                 self.message,
                 style=rio.TextStyle(fill=rio.Color.RED if self.is_error else rio.Color.GREEN),
-            ) if self.message else rio.Container()
+            )) if self.message else rio.Container(content=rio.Text(""))
         )
