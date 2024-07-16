@@ -9,6 +9,7 @@ base_uri = "http://localhost:7437"
 api_key = "YOUR_API_KEY"
 ApiClient = AGiXTSDK(base_uri=base_uri, api_key=api_key)
 
+
 class MultiSelect(rio.Component):
     options: List[Dict[str, Any]]
     selected: Set[str] = set()
@@ -27,7 +28,9 @@ class MultiSelect(rio.Component):
             self.settings.pop(extension_name, None)
         else:
             self.selected.add(extension_name)
-            self.settings[extension_name] = {setting: "" for setting in option["settings"]}
+            self.settings[extension_name] = {
+                setting: "" for setting in option["settings"]
+            }
         await self.force_refresh()
 
     def _update_setting(self, extension_name: str, setting: str, value: str) -> None:
@@ -43,31 +46,34 @@ class MultiSelect(rio.Component):
             grid.add(
                 rio.Text(
                     option["display"],
-                    justify='left',
+                    justify="left",
                     style=rio.TextStyle(
-                        font_weight='bold',
-                        fill=rio.Color.from_hex("#333")
-                    )
+                        font_weight="bold", fill=rio.Color.from_hex("#333")
+                    ),
                 ),
-                row=row_index, column=0
+                row=row_index,
+                column=0,
             )
             grid.add(
                 rio.Switch(
                     is_on=option["name"] in self.selected,
-                    on_change=lambda _, opt=option: asyncio.create_task(self._toggle_selection(opt)),
+                    on_change=lambda _, opt=option: asyncio.create_task(
+                        self._toggle_selection(opt)
+                    ),
                 ),
-                row=row_index, column=1
+                row=row_index,
+                column=1,
             )
-            status_text = "🌟 Enabled" if option["name"] in self.selected else "🔒 Disabled"
+            status_text = (
+                "🌟 Enabled" if option["name"] in self.selected else "🔒 Disabled"
+            )
             grid.add(
                 rio.Text(
                     status_text,
-                    style=rio.TextStyle(
-                        italic=True,
-                        fill=rio.Color.from_hex("#666")
-                    )
+                    style=rio.TextStyle(italic=True, fill=rio.Color.from_hex("#666")),
                 ),
-                row=row_index, column=2
+                row=row_index,
+                column=2,
             )
 
             row_index += 1
@@ -77,25 +83,30 @@ class MultiSelect(rio.Component):
                     grid.add(
                         rio.Text(
                             f"⚙️ {setting}",
-                            style=rio.TextStyle(
-                                fill=rio.Color.from_hex("#007bff")
-                            )
+                            style=rio.TextStyle(fill=rio.Color.from_hex("#007bff")),
                         ),
-                        row=row_index, column=0
+                        row=row_index,
+                        column=0,
                     )
                     grid.add(
                         rio.TextInput(
                             text=self.settings.get(option["name"], {}).get(setting, ""),
-                            on_change=lambda value, ext_name=option["name"], setting=setting: self._update_setting(ext_name, setting, value),
+                            on_change=lambda value, ext_name=option[
+                                "name"
+                            ], setting=setting: self._update_setting(
+                                ext_name, setting, value
+                            ),
                         ),
-                        row=row_index, column=1, width=2
+                        row=row_index,
+                        column=1,
+                        width=2,
                     )
                     row_index += 1
 
         done_button = rio.Button(
             "🛑 Done",
             on_press=lambda: asyncio.create_task(self._toggle_open()),
-            style='major',
+            style="major",
         )
         grid.add(done_button, row=row_index, column=0, width=3)
 
@@ -103,12 +114,12 @@ class MultiSelect(rio.Component):
             anchor=rio.Button(
                 "🛠 Edit Selection",
                 on_press=lambda: asyncio.create_task(self._toggle_open()),
-                style='major',
+                style="major",
             ),
             content=rio.ScrollContainer(
                 content=grid,
-                scroll_y='always',
-                scroll_x='never',
+                scroll_y="always",
+                scroll_x="never",
                 height=40,
                 width=100,
                 margin=0.4,
@@ -116,9 +127,10 @@ class MultiSelect(rio.Component):
             is_open=self._is_open,
             alignment=0.5,
             gap=0.4,
-            width='grow',
-            height='grow',
+            width="grow",
+            height="grow",
         )
+
 
 class AgentManagement(rio.Component):
     """
@@ -137,7 +149,9 @@ class AgentManagement(rio.Component):
             print(f"Error getting provider settings for {provider_name}: {str(e)}")
             return {}
 
-    def render_provider_settings(self, provider_name, agent_settings, provider_settings):
+    def render_provider_settings(
+        self, provider_name, agent_settings, provider_settings
+    ):
         try:
             settings = self.get_provider_settings_safe(provider_name)
             for key, value in settings.items():
@@ -164,11 +178,17 @@ class AgentManagement(rio.Component):
     async def save_agent_settings(self, agent_action, agent_name, settings, commands):
         try:
             if agent_action == "Create Agent":
-                response = await ApiClient.add_agent(agent_name=agent_name, settings=settings, commands=commands)
+                response = await ApiClient.add_agent(
+                    agent_name=agent_name, settings=settings, commands=commands
+                )
                 self.set_message(f"Agent '{agent_name}' created successfully.", False)
             elif agent_action == "Modify Agent":
-                response = await ApiClient.update_agent_settings(agent_name=agent_name, settings=settings)
-                await ApiClient.update_agent_commands(agent_name=agent_name, commands=commands)
+                response = await ApiClient.update_agent_settings(
+                    agent_name=agent_name, settings=settings
+                )
+                await ApiClient.update_agent_commands(
+                    agent_name=agent_name, commands=commands
+                )
                 self.set_message(f"Agent '{agent_name}' updated successfully.", False)
             elif agent_action == "Delete Agent":
                 response = await ApiClient.delete_agent(agent_name)
@@ -187,17 +207,23 @@ class AgentManagement(rio.Component):
             options=prompt_categories,
             selected_value=prompt_categories[0] if prompt_categories else "Default",
         )
-        available_prompts = ApiClient.get_prompts(prompt_category=prompt_category.selected_value)
+        available_prompts = ApiClient.get_prompts(
+            prompt_category=prompt_category.selected_value
+        )
         prompt_name = rio.Dropdown(
             label="Select Custom Prompt",
             options=available_prompts,
-            selected_value=prompt.get("prompt_name", available_prompts[0] if available_prompts else ""),
+            selected_value=prompt.get(
+                "prompt_name", available_prompts[0] if available_prompts else ""
+            ),
         )
         prompt_content = ApiClient.get_prompt(
-            prompt_name=prompt_name.selected_value, prompt_category=prompt_category.selected_value
+            prompt_name=prompt_name.selected_value,
+            prompt_category=prompt_category.selected_value,
         )
         prompt_args = ApiClient.get_prompt_args(
-            prompt_name=prompt_name.selected_value, prompt_category=prompt_category.selected_value
+            prompt_name=prompt_name.selected_value,
+            prompt_category=prompt_category.selected_value,
         )
         args = {
             arg: rio.TextInput(label=arg, text=str(prompt.get(arg, "")))
@@ -215,7 +241,9 @@ class AgentManagement(rio.Component):
         chain_name = rio.Dropdown(
             label="Select Chain",
             options=available_chains,
-            selected_value=prompt.get("chain", available_chains[0] if available_chains else ""),
+            selected_value=prompt.get(
+                "chain", available_chains[0] if available_chains else ""
+            ),
         )
         chain_args = ApiClient.get_chain_args(chain_name=chain_name.selected_value)
         args = {
@@ -238,9 +266,13 @@ class AgentManagement(rio.Component):
         command_name = rio.Dropdown(
             label="Select Command",
             options=available_commands,
-            selected_value=prompt.get("command_name", available_commands[0] if available_commands else ""),
+            selected_value=prompt.get(
+                "command_name", available_commands[0] if available_commands else ""
+            ),
         )
-        command_args = ApiClient.get_command_args(command_name=command_name.selected_value)
+        command_args = ApiClient.get_command_args(
+            command_name=command_name.selected_value
+        )
         args = {
             arg: rio.TextInput(label=arg, text=str(prompt.get(arg, "")))
             for arg in command_args
@@ -263,7 +295,9 @@ class AgentManagement(rio.Component):
         else:
             agent_names = [agent["name"] for agent in ApiClient.get_agents()]
             agent_name = rio.Dropdown(
-                label="Select Agent", options=agent_names, selected_value=agent_names[0] if agent_names else ""
+                label="Select Agent",
+                options=agent_names,
+                selected_value=agent_names[0] if agent_names else "",
             )
 
         providers = self.get_providers_safe()
@@ -275,7 +309,9 @@ class AgentManagement(rio.Component):
 
         agent_settings = self.get_provider_settings_safe(agent_provider.selected_value)
         if not agent_settings:
-            print(f"Warning: No settings found for provider {agent_provider.selected_value}")
+            print(
+                f"Warning: No settings found for provider {agent_provider.selected_value}"
+            )
             agent_settings = {}
 
         selected_language_provider = rio.Dropdown(
@@ -352,8 +388,10 @@ class AgentManagement(rio.Component):
                 options=[
                     {
                         "name": ext.get("name", f"Extension_{i}"),
-                        "display": ext.get("friendly_name", ext.get("name", f"Extension_{i}")),
-                        "settings": ext.get("settings", [])
+                        "display": ext.get(
+                            "friendly_name", ext.get("name", f"Extension_{i}")
+                        ),
+                        "settings": ext.get("settings", []),
                     }
                     for i, ext in enumerate(extensions)
                 ],
@@ -387,17 +425,18 @@ class AgentManagement(rio.Component):
             self.command_selection(prompt=agent_settings, show_user_input=False)
         ]
 
-        command_variable = rio.TextInput(
-            label="Command Variable",
-            text=""
-        )
+        command_variable = rio.TextInput(label="Command Variable", text="")
 
         save_button = rio.Button(
             "Save",
             on_press=lambda: asyncio.create_task(
                 self.save_agent_settings(
                     agent_action.selected_value,
-                    agent_name.text if agent_action.selected_value == "Create Agent" else agent_name.selected_value,
+                    (
+                        agent_name.text
+                        if agent_action.selected_value == "Create Agent"
+                        else agent_name.selected_value
+                    ),
                     {
                         "Language Provider": selected_language_provider.selected_value,
                         "Vision Provider": selected_vision_provider.selected_value,
@@ -408,13 +447,31 @@ class AgentManagement(rio.Component):
                         "Extensions": list(multi_select_extension.selected),
                         "Helper Agent": helper_agent.selected_value,
                         "Chat Completions Mode": chat_completions_mode.selected_value,
-                        **(self.prompt_selection(prompt=agent_settings, show_user_input=False) if chat_completions_mode.selected_value == "prompt" else {}),
-                        **(self.chain_selection(prompt=agent_settings, show_user_input=False) if chat_completions_mode.selected_value == "chain" else {}),
-                        **(self.command_selection(prompt=agent_settings, show_user_input=False) if chat_completions_mode.selected_value == "command" else {}),
+                        **(
+                            self.prompt_selection(
+                                prompt=agent_settings, show_user_input=False
+                            )
+                            if chat_completions_mode.selected_value == "prompt"
+                            else {}
+                        ),
+                        **(
+                            self.chain_selection(
+                                prompt=agent_settings, show_user_input=False
+                            )
+                            if chat_completions_mode.selected_value == "chain"
+                            else {}
+                        ),
+                        **(
+                            self.command_selection(
+                                prompt=agent_settings, show_user_input=False
+                            )
+                            if chat_completions_mode.selected_value == "command"
+                            else {}
+                        ),
                     },
-                    command_variable.text
+                    command_variable.text,
                 )
-            )
+            ),
         )
 
         return rio.Column(
@@ -426,23 +483,49 @@ class AgentManagement(rio.Component):
                 rio.Column(
                     rio.Markdown("### Language Provider"),
                     selected_language_provider,
-                    *[component for component in provider_settings.values() if isinstance(component, rio.Component)],
+                    *[
+                        component
+                        for component in provider_settings.values()
+                        if isinstance(component, rio.Component)
+                    ],
                 ),
                 rio.Column(
                     rio.Markdown("### Vision Provider (Optional)"),
                     selected_vision_provider,
-                    *([component for component in provider_settings.values() if isinstance(component, rio.Component)] 
-                      if selected_vision_provider.selected_value != "None" else [rio.Container(content=rio.Text(""))]),
+                    *(
+                        [
+                            component
+                            for component in provider_settings.values()
+                            if isinstance(component, rio.Component)
+                        ]
+                        if selected_vision_provider.selected_value != "None"
+                        else [rio.Container(content=rio.Text(""))]
+                    ),
                     rio.Markdown("### Text to Speech Provider"),
                     selected_tts_provider,
-                    *[component for component in provider_settings.values() if isinstance(component, rio.Component)],
+                    *[
+                        component
+                        for component in provider_settings.values()
+                        if isinstance(component, rio.Component)
+                    ],
                     rio.Markdown("### Speech to Text Provider"),
                     selected_stt_provider,
-                    *[component for component in provider_settings.values() if isinstance(component, rio.Component)],
+                    *[
+                        component
+                        for component in provider_settings.values()
+                        if isinstance(component, rio.Component)
+                    ],
                     rio.Markdown("### Image Generation Provider (Optional)"),
                     selected_image_provider,
-                    *([component for component in provider_settings.values() if isinstance(component, rio.Component)] 
-                      if selected_image_provider.selected_value != "None" else [rio.Container(content=rio.Text(""))]),
+                    *(
+                        [
+                            component
+                            for component in provider_settings.values()
+                            if isinstance(component, rio.Component)
+                        ]
+                        if selected_image_provider.selected_value != "None"
+                        else [rio.Container(content=rio.Text(""))]
+                    ),
                     rio.Markdown("### Embeddings Provider"),
                     selected_embedding_provider,
                 ),
@@ -460,15 +543,41 @@ class AgentManagement(rio.Component):
             ),
             rio.Markdown("## Configure Chat Completions Mode"),
             chat_completions_mode,
-            *prompt_settings_elements if chat_completions_mode.selected_value == "prompt" else [],
-            *chain_settings_elements if chat_completions_mode.selected_value == "chain" else [],
+            *(
+                prompt_settings_elements
+                if chat_completions_mode.selected_value == "prompt"
+                else []
+            ),
+            *(
+                chain_settings_elements
+                if chat_completions_mode.selected_value == "chain"
+                else []
+            ),
             rio.Row(
-                rio.Column(*command_settings_elements if chat_completions_mode.selected_value == "command" else []),
-                rio.Column(command_variable if chat_completions_mode.selected_value == "command" else rio.Container(content=rio.Text(""))),
+                rio.Column(
+                    *(
+                        command_settings_elements
+                        if chat_completions_mode.selected_value == "command"
+                        else []
+                    )
+                ),
+                rio.Column(
+                    command_variable
+                    if chat_completions_mode.selected_value == "command"
+                    else rio.Container(content=rio.Text(""))
+                ),
             ),
             save_button,
-            rio.Container(content=rio.Text(
-                self.message,
-                style=rio.TextStyle(fill=rio.Color.RED if self.is_error else rio.Color.GREEN),
-            )) if self.message else rio.Container(content=rio.Text(""))
+            (
+                rio.Container(
+                    content=rio.Text(
+                        self.message,
+                        style=rio.TextStyle(
+                            fill=rio.Color.RED if self.is_error else rio.Color.GREEN
+                        ),
+                    )
+                )
+                if self.message
+                else rio.Container(content=rio.Text(""))
+            ),
         )
