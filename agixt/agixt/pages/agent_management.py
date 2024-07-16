@@ -154,6 +154,13 @@ class AgentManagement(rio.Component):
             print(f"Error rendering provider settings for {provider_name}: {str(e)}")
             return provider_settings
 
+    def get_providers_safe(self):
+        try:
+            return ApiClient.get_providers()
+        except Exception as e:
+            print(f"Error getting providers: {str(e)}")
+            return []  # Return an empty list if there's an error
+
     async def save_agent_settings(self, agent_action, agent_name, settings, commands):
         try:
             if agent_action == "Create Agent":
@@ -259,46 +266,51 @@ class AgentManagement(rio.Component):
                 label="Select Agent", options=agent_names, selected_value=agent_names[0] if agent_names else ""
             )
 
+        providers = self.get_providers_safe()
         agent_provider = rio.Dropdown(
             label="Select Provider",
-            options=ApiClient.get_providers(),
-            selected_value=ApiClient.get_providers()[0] if ApiClient.get_providers() else "",
+            options=providers,
+            selected_value=providers[0] if providers else "",
         )
 
         agent_settings = self.get_provider_settings_safe(agent_provider.selected_value)
+        if not agent_settings:
+            print(f"Warning: No settings found for provider {agent_provider.selected_value}")
+            agent_settings = {}
+
         selected_language_provider = rio.Dropdown(
             label="Language Provider",
-            options=ApiClient.get_providers(),
+            options=providers,
             selected_value=agent_settings.get("Language Provider", ""),
         )
 
         selected_vision_provider = rio.Dropdown(
             label="Vision Provider (Optional)",
-            options=["None"] + ApiClient.get_providers(),
+            options=["None"] + providers,
             selected_value=agent_settings.get("Vision Provider", "None"),
         )
 
         selected_tts_provider = rio.Dropdown(
             label="Text to Speech Provider",
-            options=ApiClient.get_providers(),
+            options=providers,
             selected_value=agent_settings.get("Text to Speech Provider", ""),
         )
 
         selected_stt_provider = rio.Dropdown(
             label="Speech to Text Provider",
-            options=ApiClient.get_providers(),
+            options=providers,
             selected_value=agent_settings.get("Speech to Text Provider", ""),
         )
 
         selected_image_provider = rio.Dropdown(
             label="Image Generation Provider (Optional)",
-            options=["None"] + ApiClient.get_providers(),
+            options=["None"] + providers,
             selected_value=agent_settings.get("Image Generation Provider", "None"),
         )
 
         selected_embedding_provider = rio.Dropdown(
             label="Embeddings Provider",
-            options=ApiClient.get_providers(),
+            options=providers,
             selected_value=agent_settings.get("Embeddings Provider", ""),
         )
 
@@ -334,10 +346,22 @@ class AgentManagement(rio.Component):
             provider_settings,
         )
 
-        multi_select_extension = MultiSelect(
-            options=ApiClient.get_extensions(),
-            selected=set(agent_settings.get("Extensions", [])),
-        )
+        try:
+            extensions = ApiClient.get_extensions()
+            multi_select_extension = MultiSelect(
+                options=[
+                    {
+                        "name": ext.get("name", f"Extension_{i}"),
+                        "display": ext.get("friendly_name", ext.get("name", f"Extension_{i}")),
+                        "settings": ext.get("settings", [])
+                    }
+                    for i, ext in enumerate(extensions)
+                ],
+                selected=set(agent_settings.get("Extensions", [])),
+            )
+        except Exception as e:
+            print(f"Error getting extensions: {str(e)}")
+            multi_select_extension = MultiSelect(options=[], selected=set())
 
         helper_agent = rio.Dropdown(
             label="Helper Agent (Optional)",
